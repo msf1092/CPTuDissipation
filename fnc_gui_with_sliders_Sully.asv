@@ -1,0 +1,91 @@
+function [u0_sqrt, u_max, t_50, ] = fnc_gui_with_sliders_Sully(x,y,y0,x1_min,x1_max,y1_min,y1_max,x2_min,x2_max,y2_min,y2_max,test_depth)
+%Plotting the interactive chart for identification of the secant line:
+
+% Create GUI figure
+fig = uifigure('Name', 'Adjust Dissipation Lines', 'Position', [100 100 800 600]);
+
+% Create axes
+ax = uiaxes(fig, 'Position', [50 150 700 400]);
+ax.XGrid = 'on'; ax.YGrid = 'on';
+ax.XMinorGrid = 'on'; ax.YMinorGrid = 'on';
+hold(ax, 'on');
+
+% Plot data
+mainPlot = plot(ax, x, y, 'LineStyle', '-', 'DisplayName', sprintf('$d=$ %0.2f m', test_depth));
+scatter(ax, x, y, 10, 'red', 'filled', '^', 'HandleVisibility', 'off'); % Exclude from legend
+line1 = plot(ax, [0 x1_max], [y1_min y0], 'LineStyle', '-.', 'DisplayName', 'Line 1');
+line2 = plot(ax, [0 x2_max], [y2_min y0], 'LineStyle', '-.', 'DisplayName', 'Line 2');
+legend(ax, 'Interpreter', 'latex', 'FontSize', 10, 'Location', 'northeast');
+xlabel(ax, '$\sqrt{t}$ (sec)', 'Interpreter', 'latex', 'FontSize', 10);
+ylabel(ax, 'pore water pressure, $u$ (kPa)', 'Interpreter', 'latex', 'FontSize', 10);
+
+% Create slider and labels for Line 2 start (y2_min)
+uilabel(fig, 'Position', [50 100 150 20], 'Text', 'Fitting line: Start (y2\_min)');
+slider_y2min = uislider(fig, 'Position', [200 110 150 3], 'Limits', [0 3*y2_min], 'Value', y2_min);
+
+% Create slider and labels for Line 2 end (x2_max)
+uilabel(fig, 'Position', [400 100 150 20], 'Text', 'Fitting line: End (x2\_max)');
+slider_x2max = uislider(fig, 'Position', [550 110 150 3], 'Limits', [0 max(x)], 'Value', x2_max);
+
+% Create Finish Button
+uibutton(fig, 'Position', [350 20 100 30], 'Text', 'Finish', ...
+    'ButtonPushedFcn', @(btn, event) finishCallback());
+
+% Slider callbacks to update the second line in real-time
+addlistener(slider_y2min, 'ValueChanged', @(~, ~) updateLine2());
+addlistener(slider_x2max, 'ValueChanged', @(~, ~) updateLine2());
+
+% Callback to update the second line
+    function updateLine2()
+        % Get updated slider values
+        new_y2_min = slider_y2min.Value;
+        new_x2_max = slider_x2max.Value;
+
+        line2.XData = [0 new_x2_max];
+        line2.YData = [new_y2_min y0];
+
+        % Refresh plot (optional but useful for responsiveness)
+        drawnow;
+    end
+
+% Callback to finish adjustments and save results
+    function finishCallback()
+        % Save adjusted values
+        u_max  = slider_y2min.Value;
+        u0_sqrt  = slider_x2max.Value;
+        t_50 = (u0_sqrt / 2) ^ 2;
+        u_50 = (u_max - y0) / 2;
+
+        % Display saved values
+        disp('Adjusted Line 2:');
+        disp(['Start (y2_min) = ', num2str(u_max)]);
+        disp(['End (x2_max) = ', num2str(u0_sqrt)]);
+
+        % Create a new figure with adjusted values
+        f = figure('Name', 'Dissipation t50-Sully', 'units','centimeters', 'Position', [5 5 9 8]);
+        set(f,'defaulttextinterpreter','latex');
+        hold on;
+        plot(x, y, 'LineStyle', '-', 'DisplayName', sprintf('$d=$ %0.2f m', test_depth));
+        scatter(x, y, 10, 'red', 'filled', '^', 'HandleVisibility', 'off'); % Exclude from legend
+        scatter(t_50^0.5, u_50, 20, 'black', 'filled', 'o', 'HandleVisibility', 'off'); % Exclude from legend
+        plot([0 x1_max],[y0 y0], 'LineStyle', '-.', 'DisplayName', 'in-situ $u$', 'HandleVisibility', 'off')
+        plot([0 u0_sqrt], [u_max y0], 'LineStyle', '-.', 'DisplayName', 'Adjusted Line 2', 'HandleVisibility', 'off');
+        text(0, u_max, sprintf('$u_{max}$=%0.2f',u_max), 'Interpreter', 'latex', 'FontSize', 9, ...
+            'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', 'Color', 'blue');
+        text(0, y0, '$u_{0}$', 'Interpreter', 'latex', 'FontSize', 9, ...
+            'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', 'Color', 'blue');
+        text(t_50^0.5, u_50, sprintf('  $t_{50}$=%0.2f sec',t_50), 'Interpreter', 'latex', 'FontSize', 9, ...
+            'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle', 'Color', 'blue');
+        xlabel('$\sqrt{t}$ (sec)', 'Interpreter', 'latex', 'FontSize', 10);
+        ylabel('Pore water pressure, $u$ (kPa)', 'Interpreter', 'latex', 'FontSize', 10);
+        legend('show', 'Interpreter', 'latex', 'FontSize', 10, 'Location', 'northeast');
+        grid on; grid minor
+        hold off;
+        box on;
+
+        % Close the GUI
+        close(fig);
+    end
+% Wait for GUI to close before returning outputs
+uiwait(fig);
+end
